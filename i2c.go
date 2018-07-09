@@ -25,7 +25,10 @@ func isMn(r rune) bool {
 func encodeText(s string) []byte {
 	res := []byte{}
 
-	s = transform.String(ttc, s)
+	s, _, err := transform.String(ttc, s)
+	if err != nil {
+		panic(err)
+	}
 
 	for _, r := range []rune(s) {
 		res = append(res, font[r]...)
