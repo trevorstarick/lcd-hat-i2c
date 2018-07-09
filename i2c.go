@@ -8,14 +8,14 @@ import (
 	"github.com/stianeikeland/go-rpio"
 	"golang.org/x/exp/io/i2c"
 	"golang.org/x/text/transform"
-    "golang.org/x/text/unicode/norm"
+	"golang.org/x/text/unicode/norm"
 )
 
 var dev *i2c.Device
 var rng *rand.Rand
 var m uint = 1
 
-var ttc := transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
+var ttc = transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
 
 func isMn(r rune) bool {
 	return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks
@@ -155,15 +155,13 @@ func main() {
 	// enc = encodeText("¯\\_(ツ)_/¯")
 	// enc = append(make([]byte, (128-len(enc))/2), enc...)
 	// writeData(enc)
-
 	// return
 
-	writeRegister(0xB7, 0x02, 0x10)
-	enc = encodeText("45.5017° N, 73.5673° W")
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
-
-	return
+	// writeRegister(0xB7, 0x02, 0x10)
+	// enc = encodeText("45.5017° N, 73.5673° W")
+	// enc = append(make([]byte, (128-len(enc))/2), enc...)
+	// writeData(enc)
+	// return
 
 	writeRegister(0xB7, 0x02, 0x10)
 	enc = encodeText("Mark Nottingham (@mnot)")
