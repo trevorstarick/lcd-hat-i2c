@@ -1,0 +1,10 @@
+[Unit]
+Description=i2c display binary
+
+[Service]
+Type=simple
+ExecStart=/home/trevorstarick/i2c/i2c
+
+[Install]
+WantedBy=multi-user.target
+Alias=i2c.service
