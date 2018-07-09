@@ -122,7 +122,7 @@ func main() {
 	writeRegister(0x40)       //--set start line address  Set Mapping RAM Display Start Line (0x00~0x3F)
 	// writeRegister(0xad, 0x8b) //--set charge pump
 	writeRegister(0x81, 0xff) //--set contrast control register
-	writeRegister(0xA1, 0xc0) // set rotation and direction
+	writeRegister(0xA6, 0xc8) // set rotation and direction
 	writeRegister(0xA6)       // set normal/reverse (0xa6-0xa7)
 	writeRegister(0xA8, 0x3f) //--set multiplex ratio(1 to 64)
 	writeRegister(0xD3, 0x00) //-set display offset    Shift Mapping RAM Counter (0x00~0x3F)
