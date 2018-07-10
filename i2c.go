@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
+	"sort"
+	"strings"
 	"time"
 	"unicode"
 
@@ -20,7 +23,6 @@ var ttc = transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
 func isMn(r rune) bool {
 	return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks
 }
-
 
 func encodeText(s string) []byte {
 	res := []byte{}
@@ -163,8 +165,45 @@ func main() {
 	// writeData(enc)
 	// return
 
+	keys := make([]int, 0)
+	for k := range font {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+
+	// for range `60 fps` { ... }
+	// for range time.NewTicker(time.Second / 60).C {
+	// 	for p := 7; p >= 0; p-- {
+	// 		for len(enc) <= 128 {
+	// 			k := keys[rand.Intn(len(keys))]
+	// 			enc = append(enc, font[rune(k)]...)
+	// 		}
+
+	// 		writeRegister(0xB0+byte(p), 0x02, 0x10)
+	// 		writeData(enc)
+	// 		enc = []byte{}
+	// 	}
+	// }
+
+	// return
+
+	type tweet struct {
+		name   string
+		handle string
+		text   string
+		date   time.Time
+	}
+
+	date, _ := time.Parse("3:04 PM - 2 Jan 2006", "10:03 PM - 8 Jul 2018")
+	t := tweet{
+		name:   "Mark Nottingham",
+		handle: "mnot",
+		text:   "TIL: Chrome disables the browser cache if it thinks it's on a broken HTTPS connection (e.g., invalid cert)",
+		date:   date,
+	}
+
 	writeRegister(0xB7, 0x02, 0x10)
-	enc = encodeText("Mark Nottingham (@mnot)")
+	enc = encodeText(fmt.Sprintf("%v (%v)", t.name, t.handle))
 	enc = append(make([]byte, (128-len(enc))/2), enc...)
 	writeData(enc)
 
@@ -173,25 +212,18 @@ func main() {
 	enc = append(make([]byte, (128-len(enc))/2), enc...)
 	writeData(enc)
 
-	writeRegister(0xB5, 0x02, 0x10)
-	enc = encodeText("TIL: Chrome disables the")
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
+	p := 6
+	for _, w := range strings.Split(t.text, " ") {
+		encoded := encodeText(w + " ")
+		if len(enc)+len(encoded) > 128-1 {
+			writeRegister(0xB0+byte(p), 0x02, 0x10)
+			writeData(enc)
+			enc = []byte{}
+			p--
+		}
 
-	writeRegister(0xB4, 0x02, 0x10)
-	enc = encodeText("browser cache if it thinks it's")
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
-
-	writeRegister(0xB3, 0x02, 0x10)
-	enc = encodeText("on a broken HTTPS connection")
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
-
-	writeRegister(0xB2, 0x02, 0x10)
-	enc = encodeText("(e.g., invalid cert)")
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
+		enc = append(enc, encoded...)
+	}
 
 	writeRegister(0xB1, 0x02, 0x10)
 	enc = encodeText("-------------------------------")
@@ -199,7 +231,7 @@ func main() {
 	writeData(enc)
 
 	writeRegister(0xB0, 0x02, 0x10)
-	enc = encodeText("10:03 PM - 8 Jul 2018")
+	enc = encodeText(t.date.Format("3:04 PM - 2 Jan 2006"))
 	enc = append(make([]byte, (128-len(enc))/2), enc...)
 	writeData(enc)
 }
