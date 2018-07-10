@@ -16,7 +16,8 @@ import (
 
 var dev *i2c.Device
 var rng *rand.Rand
-var m uint = 1
+
+var btn1, btn2, btn3, joyUp, joyLeft, joyRight, joyDown, joyPress rpio.Pin
 
 var ttc = transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
 
@@ -39,60 +40,13 @@ func encodeText(s string) []byte {
 	return res
 }
 
-func writeRegister(reg byte, data ...byte) {
-	if err := dev.WriteReg(0x00, append([]byte{reg}, data...)); err != nil {
-		panic(err)
-	}
-}
-
-func writeData(data []byte) {
-	if err := dev.Write(append([]byte{0x40}, data...)); err != nil {
-		panic(err)
-	}
-}
-
-func init() {
-	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-}
-
-func main() {
+func initDevice() {
 	err := rpio.Open()
 	if err != nil {
 		panic(err)
 	}
-	defer rpio.Close()
 
-	btn1 := rpio.Pin(21)
-	btn1.Input()
-	btn1.PullUp()
-
-	btn2 := rpio.Pin(20)
-	btn2.Input()
-	btn2.PullUp()
-
-	btn3 := rpio.Pin(16)
-	btn3.Input()
-	btn3.PullUp()
-
-	joyUp := rpio.Pin(6)
-	joyUp.Input()
-	joyUp.PullUp()
-
-	joyDown := rpio.Pin(19)
-	joyDown.Input()
-	joyDown.PullUp()
-
-	joyLeft := rpio.Pin(5)
-	joyLeft.Input()
-	joyLeft.PullUp()
-
-	joyRight := rpio.Pin(26)
-	joyRight.Input()
-	joyRight.PullUp()
-
-	joyPress := rpio.Pin(13)
-	joyPress.Input()
-	joyPress.PullUp()
+	initInput()
 
 	pinRST := rpio.Pin(25)
 	pinRST.Output()
@@ -108,7 +62,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer dev.Close()
 
 	pinRST.High()
 	time.Sleep(100 * time.Millisecond)
@@ -134,89 +87,76 @@ func main() {
 	writeRegister(0xDB, 0x40) //--set vcomh
 	writeRegister(0xa4, 0xa6) // Disable Entire Display On (0xa4/0xa5)
 	writeRegister(0xaf)
+}
 
-	// return
+func initInput() {
+	btn1 = rpio.Pin(21)
+	btn1.Input()
+	btn1.PullUp()
 
-	const pageSize = int(64 / 8)
-	// var screen [1024]byte
-	var page [128]byte
-	_ = page
+	btn2 = rpio.Pin(20)
+	btn2.Input()
+	btn2.PullUp()
 
-	// clear screen
-	for p := 0; p < pageSize; p++ {
+	btn3 = rpio.Pin(16)
+	btn3.Input()
+	btn3.PullUp()
+
+	joyUp = rpio.Pin(6)
+	joyUp.Input()
+	joyUp.PullUp()
+
+	joyDown = rpio.Pin(19)
+	joyDown.Input()
+	joyDown.PullUp()
+
+	joyLeft = rpio.Pin(5)
+	joyLeft.Input()
+	joyLeft.PullUp()
+
+	joyRight = rpio.Pin(26)
+	joyRight.Input()
+	joyRight.PullUp()
+
+	joyPress = rpio.Pin(13)
+	joyPress.Input()
+	joyPress.PullUp()
+}
+
+func clear() {
+	for p := 0; p < 8; p++ {
 		writeRegister(0xB0+byte(p), 0x02, 0x10)
 		t := make([]byte, 129)
 		t[0] = 0x40
 		dev.Write(t)
 	}
+}
 
-	var enc []byte
-
-	// todo: handle non ascii char
-	// writeRegister(0xB7, 0x02, 0x10)
-	// enc = encodeText("¯\\_(ツ)_/¯")
-	// enc = append(make([]byte, (128-len(enc))/2), enc...)
-	// writeData(enc)
-	// return
-
-	// writeRegister(0xB7, 0x02, 0x10)
-	// enc = encodeText("45.5017° N, 73.5673° W")
-	// enc = append(make([]byte, (128-len(enc))/2), enc...)
-	// writeData(enc)
-	// return
-
-	keys := make([]int, 0)
-	for k := range font {
-		keys = append(keys, int(k))
-	}
-	sort.Ints(keys)
-
-	// for range `60 fps` { ... }
-	// for range time.NewTicker(time.Second / 60).C {
-	// 	for p := 7; p >= 0; p-- {
-	// 		for len(enc) <= 128 {
-	// 			k := keys[rand.Intn(len(keys))]
-	// 			enc = append(enc, font[rune(k)]...)
-	// 		}
-
-	// 		writeRegister(0xB0+byte(p), 0x02, 0x10)
-	// 		writeData(enc)
-	// 		enc = []byte{}
-	// 	}
-	// }
-
-	// return
-
-	type tweet struct {
-		name   string
-		handle string
-		text   string
-		date   time.Time
-	}
-
-	date, _ := time.Parse("3:04 PM - 2 Jan 2006", "10:03 PM - 8 Jul 2018")
-	t := tweet{
-		name:   "Mark Nottingham",
-		handle: "mnot",
-		text:   "TIL: Chrome disables the browser cache if it thinks it's on a broken HTTPS connection (e.g., invalid cert)",
-		date:   date,
-	}
-
+func printText(text string) {
 	writeRegister(0xB7, 0x02, 0x10)
-	enc = encodeText(fmt.Sprintf("%v (%v)", t.name, t.handle))
+	enc := encodeText(text)
+	enc = append(make([]byte, (128-len(enc))/2), enc...)
+	writeData(enc)
+	return
+}
+
+func printTweet(name, handle, text string) {
+	var enc []byte
+	writeRegister(0xB7, 0x02, 0x10)
+	enc = encodeText(fmt.Sprintf("%v (%v)", name, handle))
 	enc = append(make([]byte, (128-len(enc))/2), enc...)
 	writeData(enc)
 
 	writeRegister(0xB6, 0x02, 0x10)
-	enc = encodeText("-------------------------------")
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
+	writeData(encodeText("--------------------------------"))
 
-	p := 6
-	for _, w := range strings.Split(t.text, " ") {
+	p := 5
+	enc = []byte{}
+	for _, w := range strings.Split(text, " ") {
 		encoded := encodeText(w + " ")
-		if len(enc)+len(encoded) > 128-1 {
+		if len(enc)+len(encoded) > 128 {
 			writeRegister(0xB0+byte(p), 0x02, 0x10)
+			enc = append(make([]byte, (128-len(enc))/2), enc...)
 			writeData(enc)
 			enc = []byte{}
 			p--
@@ -225,13 +165,177 @@ func main() {
 		enc = append(enc, encoded...)
 	}
 
-	writeRegister(0xB1, 0x02, 0x10)
-	enc = encodeText("-------------------------------")
+	writeRegister(0xB0+byte(p), 0x02, 0x10)
 	enc = append(make([]byte, (128-len(enc))/2), enc...)
 	writeData(enc)
+}
 
-	writeRegister(0xB0, 0x02, 0x10)
-	enc = encodeText(t.date.Format("3:04 PM - 2 Jan 2006"))
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
+func printDots() {
+	var m = 1
+	for {
+		if btn1.Read() == rpio.Low {
+			m = 0
+		} else if btn2.Read() == rpio.Low {
+			m = 1
+		} else if btn3.Read() == rpio.Low {
+			m = 2
+		} else if joyPress.Read() == rpio.Low {
+			break
+		}
+
+		for p := 0; p < 8; p++ {
+			writeRegister(0xB0+byte(p), 0x02, 0x10)
+
+			t := make([]byte, 129)
+			rand.Read(t)
+
+			for i := range t {
+				switch m {
+				case 1:
+					if i%2 != 0 {
+						t[i] = 0
+					} else {
+						t[i] &= 0xaa
+					}
+				case 2:
+					if i%4 != 0 {
+						t[i] = 0
+					} else {
+						t[i] &= 0x88
+					}
+				case 3:
+					t[i] = 0
+				default:
+				}
+			}
+
+			t[0] = 0x40
+			dev.Write(t)
+		}
+	}
+}
+
+func wait() {
+	for {
+		if joyPress.Read() == rpio.Low {
+			break
+		}
+	}
+
+	time.Sleep(100 * time.Millisecond)
+}
+
+func printFont() {
+	var enc []byte
+
+	keys := make([]int, 0)
+	for k := range font {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+
+	p := 7
+
+	for _, k := range keys {
+		enc = append(enc, font[rune(k)]...)
+
+		if len(enc) == 128 {
+			writeRegister(0xB0+byte(p), 0x02, 0x10)
+			writeData(enc)
+			p--
+			enc = []byte{}
+		}
+	}
+
+	writeRegister(0xB0+byte(p), 0x02, 0x10)
 	writeData(enc)
+}
+
+func printRandomRune() {
+	var enc []byte
+
+	keys := make([]int, 0)
+	for k := range font {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+
+	// for range `60 fps` { ... }
+	for range time.NewTicker(time.Second / 60).C {
+		if joyPress.Read() == rpio.Low {
+			break
+		}
+
+		for p := 7; p >= 0; p-- {
+			for len(enc) <= 128 {
+				k := keys[rand.Intn(len(keys))]
+				enc = append(enc, font[rune(k)]...)
+			}
+
+			writeRegister(0xB0+byte(p), 0x02, 0x10)
+			writeData(enc)
+			enc = []byte{}
+		}
+	}
+}
+
+func writeRegister(reg byte, data ...byte) {
+	if err := dev.WriteReg(0x00, append([]byte{reg}, data...)); err != nil {
+		panic(err)
+	}
+}
+
+func writeData(data []byte) {
+	if err := dev.Write(append([]byte{0x40}, data...)); err != nil {
+		panic(err)
+	}
+}
+
+func init() {
+	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	initDevice()
+}
+
+func main() {
+	defer rpio.Close()
+	defer dev.Close()
+
+	for {
+		// clear screen
+		clear()
+
+		// todo: handle non ascii char
+		printText("¯\\_(ツ)_/¯")
+		printText("45.5017° N, 73.5673° W")
+		wait()
+		clear()
+
+		printFont()
+		wait()
+		clear()
+
+		printRandomRune()
+		time.Sleep(100 * time.Millisecond)
+		clear()
+
+		printDots()
+		time.Sleep(100 * time.Millisecond)
+		clear()
+
+		printTweet(
+			"Mark Nottingham",
+			"mnot",
+			"TIL: Chrome disables the browser cache if it thinks it's on a broken HTTPS connection (e.g., invalid cert)",
+		)
+		wait()
+		clear()
+
+		printTweet(
+			"Robin Ward",
+			"eviltrout",
+			"Bad Blood is a stressful read for me. Theranos has all the bad elements of every startup I've ever encountered, but amplified 100x.",
+		)
+		wait()
+		clear()
+	}
 }
