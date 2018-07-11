@@ -101,21 +101,21 @@ func initDevice() {
 	pinRST.High()
 	time.Sleep(100 * time.Millisecond)
 
-	writeRegister(0xAE)       //--turn off oled panel
-	writeRegister(0x02, 0x10) //---set low column address
-	writeRegister(0x40)       //--set start line address  Set Mapping RAM Display Start Line (0x00~0x3F)
-	// writeRegister(0xad, 0x8b) //--set charge pump
-	writeRegister(0x81, 0xff) //--set contrast control register
-	writeRegister(0xA6, 0xc8) // set rotation and direction
-	writeRegister(0xA6)       // set normal/reverse (0xa6-0xa7)
-	writeRegister(0xA8, 0x3f) //--set multiplex ratio(1 to 64)
-	writeRegister(0xD3, 0x00) //-set display offset    Shift Mapping RAM Counter (0x00~0x3F)
-	writeRegister(0xd5, 0x80) //--set display clock divide ratio/oscillator frequency
-	writeRegister(0xD9, 0xff) //--set pre-charge period
-	writeRegister(0xDA, 0x12) //--set com pins hardware configuration
-	writeRegister(0xDB, 0x40) //--set vcomh
-	writeRegister(0xa4, 0xa6) // Disable Entire Display On (0xa4/0xa5)
-	writeRegister(0xaf)
+	writeRegister(0xae)       // turn off oled panel
+	writeRegister(0x02, 0x10) // set low column address
+	writeRegister(0x40, 0x00) // set start line address
+	writeRegister(0xad, 0x8b) // set charge pump
+	writeRegister(0x81, 0xff) // set contrast control register
+	writeRegister(0xa0, 0xc8) // set display mirror and direction (0xa0 / 0xa1) (0xc0 / 0xc8)
+	// writeRegister(0xa1, 0xc0)
+	writeRegister(0xa6)       // set normal/reverse (0xa6 / 0xa7)
+	writeRegister(0xa8, 0x3f) // set multiplex ratio (1 to 64)
+	writeRegister(0xd3, 0x00) // set display offset
+	writeRegister(0xd5, 0x80) // set display clock divide ratio/oscillator frequency
+	writeRegister(0xd9, 0xff) // set pre-charge period
+	writeRegister(0xda, 0x12) // set com pins hardware configuration
+	writeRegister(0xdb, 0x40) // set vcomh
+	writeRegister(0xaf)       // turn on oled panel
 }
 
 func initInput() {
