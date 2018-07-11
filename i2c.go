@@ -54,11 +54,8 @@ func isMn(r rune) bool {
 	return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks
 }
 
-func encodeText(s string) []byte {
-	res := []byte{}
-
-	s, _, err := transform.String(ttc, s)
-	if err != nil {
+func writeRegister(reg byte, data ...byte) {
+	if err := dev.WriteReg(0x00, append([]byte{reg}, data...)); err != nil {
 		panic(err)
 	}
 
@@ -318,18 +315,6 @@ func printRandomRune() {
 			writeData(enc)
 			enc = []byte{}
 		}
-	}
-}
-
-func writeRegister(reg byte, data ...byte) {
-	if err := dev.WriteReg(0x00, append([]byte{reg}, data...)); err != nil {
-		panic(err)
-	}
-}
-
-func writeData(data []byte) {
-	if err := dev.Write(append([]byte{0x40}, data...)); err != nil {
-		panic(err)
 	}
 }
 
