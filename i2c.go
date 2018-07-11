@@ -15,6 +15,10 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+const screenWidth = 132
+
+// var font map[rune][]byte
+
 var dev *i2c.Device
 var rng *rand.Rand
 
@@ -58,12 +62,12 @@ func writeRegister(reg byte, data ...byte) {
 	if err := dev.WriteReg(0x00, append([]byte{reg}, data...)); err != nil {
 		panic(err)
 	}
+}
 
-	for _, r := range []rune(s) {
-		res = append(res, font[r]...)
+func writeData(data []byte) {
+	if err := dev.Write(append([]byte{0x40}, data...)); err != nil {
+		panic(err)
 	}
-
-	return res
 }
 
 func initDevice() {
@@ -158,32 +162,16 @@ func clear() {
 	}
 }
 
-func printText(text string) {
-	writeRegister(0xB7, 0x02, 0x10)
-	enc := encodeText(text)
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
-	return
+func wait() {
+	for {
+		if joyPress.Read() == rpio.Low {
+			break
+		}
+	}
+
+	time.Sleep(250 * time.Millisecond)
 }
 
-func printTweet(name, handle, text string) {
-	var enc []byte
-	writeRegister(0xB7, 0x02, 0x10)
-	enc = encodeText(fmt.Sprintf("%v (%v)", name, handle))
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
-
-	writeRegister(0xB6, 0x02, 0x10)
-	writeData(encodeText("--------------------------------"))
-
-	p := 5
-	enc = []byte{}
-	for _, w := range strings.Split(text, " ") {
-		encoded := encodeText(w + " ")
-		if len(enc)+len(encoded) > 128 {
-			writeRegister(0xB0+byte(p), 0x02, 0x10)
-			enc = append(make([]byte, (128-len(enc))/2), enc...)
-			writeData(enc)
 func padLeft(d []byte) []byte {
 	padding := make([]byte, (128 - len(d)))
 	return append(padding, d...)
@@ -197,16 +185,87 @@ func padCenter(d []byte) []byte {
 	padding := make([]byte, (128-len(d))/2)
 	return append(padding, d...)
 }
+
+func buildText(text string) [][]byte {
+	var pages [][]byte
+
+	for _, t := range strings.Split(text, "\n") {
+		var enc []byte
+
+		for _, w := range strings.Split(t, " ") {
+			encoded := encodeText(w + " ")
+			// the extra `-4` at the end is to get rid of the trailing <space>
+			if len(enc)+len(encoded) > screenWidth {
+				pages = append(pages, enc)
+				enc = encoded
+			} else {
+				enc = append(enc, encoded...)
+			}
+		}
+
+		if len(enc) > 0 {
+			pages = append(pages, enc[:len(enc)-4])
 			enc = []byte{}
 			p--
 		}
-
-		enc = append(enc, encoded...)
 	}
 
-	writeRegister(0xB0+byte(p), 0x02, 0x10)
-	enc = append(make([]byte, (128-len(enc))/2), enc...)
-	writeData(enc)
+	// trim pages
+	if len(pages[len(pages)-1]) == 0 {
+		pages = pages[:len(pages)-1]
+	}
+
+	return pages
+}
+
+func encodeText(s string) []byte {
+	res := []byte{}
+
+	s = strings.Replace(s, "\t", "  ", -1)
+
+	s, _, err := transform.String(ttc, s)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, r := range []rune(s) {
+		res = append(res, font[r]...)
+	}
+
+	return res
+}
+
+func printTextWithTitle(title, text string, offset ...int) int {
+	printText(title, 0)
+	printText(strings.Join(make([]string, screenWidth/4), "-"), 1)
+
+	return printText(text, 2) - 2
+}
+
+func printText(text string, _offset ...int) int {
+	var offset int
+
+	if len(_offset) == 0 {
+		offset = 0
+	} else {
+		offset = _offset[0]
+	}
+
+	pages := buildText(text)
+
+	start := 0
+	end := len(pages)
+	if end > 7 {
+		end = 7
+	}
+
+	for _, page := range pages[start:end] {
+		writeRegister(0xB7-byte(offset), 0x02, 0x10)
+		writeData(page)
+		offset++
+	}
+
+	return offset
 }
 
 func printDots() {
@@ -254,40 +313,22 @@ func printDots() {
 	}
 }
 
-func wait() {
-	for {
-		if joyPress.Read() == rpio.Low {
-			break
-		}
-	}
-
-	time.Sleep(100 * time.Millisecond)
-}
-
 func printFont() {
-	var enc []byte
-
 	keys := make([]int, 0)
 	for k := range font {
 		keys = append(keys, int(k))
 	}
 	sort.Ints(keys)
 
-	p := 7
-
-	for _, k := range keys {
-		enc = append(enc, font[rune(k)]...)
-
-		if len(enc) == 128 {
-			writeRegister(0xB0+byte(p), 0x02, 0x10)
-			writeData(enc)
-			p--
-			enc = []byte{}
+	fontString := ""
+	for i, k := range keys {
+		fontString += string(k)
+		if i%(screenWidth/4) == (screenWidth/4)-1 {
+			fontString += "\n"
 		}
 	}
 
-	writeRegister(0xB0+byte(p), 0x02, 0x10)
-	writeData(enc)
+	printText(fontString, 0)
 }
 
 func printRandomRune() {
@@ -306,7 +347,7 @@ func printRandomRune() {
 		}
 
 		for p := 7; p >= 0; p-- {
-			for len(enc) <= 128 {
+			for len(enc) <= screenWidth {
 				k := keys[rand.Intn(len(keys))]
 				enc = append(enc, font[rune(k)]...)
 			}
