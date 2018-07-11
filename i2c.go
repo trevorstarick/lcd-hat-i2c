@@ -187,6 +187,19 @@ func printTweet(name, handle, text string) {
 			writeRegister(0xB0+byte(p), 0x02, 0x10)
 			enc = append(make([]byte, (128-len(enc))/2), enc...)
 			writeData(enc)
+func padLeft(d []byte) []byte {
+	padding := make([]byte, (128 - len(d)))
+	return append(padding, d...)
+}
+
+func padRight(d []byte) []byte {
+	padding := make([]byte, (128 - len(d)))
+	return append(d, padding...)
+}
+func padCenter(d []byte) []byte {
+	padding := make([]byte, (128-len(d))/2)
+	return append(padding, d...)
+}
 			enc = []byte{}
 			p--
 		}
