@@ -274,48 +274,69 @@ func printText(text string, _offset ...int) int {
 	return offset
 }
 
-func printDots() {
-	var m = 1
-	for {
-		if btn1.Read() == rpio.Low {
-			m = 0
-		} else if btn2.Read() == rpio.Low {
-			m = 1
-		} else if btn3.Read() == rpio.Low {
-			m = 2
-		} else if joyPress.Read() == rpio.Low {
-			break
-		}
+func bootScreen(text string) {
+	for p := 0; p < 8; p++ {
+		writeRegister(0xB7-byte(p), 0x02, 0x10)
 
-		for p := 0; p < 8; p++ {
-			writeRegister(0xB0+byte(p), 0x02, 0x10)
+		t := make([]byte, screenWidth)
+		rand.Read(t)
 
-			t := make([]byte, 129)
-			rand.Read(t)
-
-			for i := range t {
-				switch m {
-				case 1:
-					if i%2 != 0 {
-						t[i] = 0
-					} else {
-						t[i] &= 0xaa
-					}
-				case 2:
-					if i%4 != 0 {
-						t[i] = 0
-					} else {
-						t[i] &= 0x88
-					}
-				case 3:
-					t[i] = 0
-				default:
-				}
+		for i := range t {
+			if i%2 != 0 {
+				t[i] = 0
+			} else {
+				t[i] &= 0xaa
 			}
-
-			t[0] = 0x40
-			dev.Write(t)
 		}
+
+		if p == 3 {
+			text := encodeText(" " + text + " ")
+			for i, c := range text {
+				t[i+(128-len(text))/2] = c
+			}
+		}
+
+		t = append([]byte{0x40}, t...)
+		dev.Write(t)
+	}
+}
+
+func printDots(_m ...int) {
+	var m int
+	if len(_m) == 0 || _m[0] > 3 || _m[0] < 0 {
+		m = 1
+	} else {
+		m = _m[0]
+	}
+
+	for p := 0; p < 8; p++ {
+		writeRegister(0xB0+byte(p), 0x02, 0x10)
+
+		t := make([]byte, 129)
+		rand.Read(t)
+
+		for i := range t {
+			switch m {
+			case 1:
+				if i%2 != 0 {
+					t[i] = 0
+				} else {
+					t[i] &= 0xaa
+				}
+			case 2:
+				if i%4 != 0 {
+					t[i] = 0
+				} else {
+					t[i] &= 0x88
+				}
+			case 3:
+				t[i] = 0
+			default:
+			}
+		}
+
+		t[0] = 0x40
+		dev.Write(t)
 	}
 }
 
@@ -340,28 +361,22 @@ func printFont() {
 func printRandomRune() {
 	var enc []byte
 
+	// todo: improve key decleration
 	keys := make([]int, 0)
 	for k := range font {
 		keys = append(keys, int(k))
 	}
 	sort.Ints(keys)
 
-	// for range `60 fps` { ... }
-	for range time.NewTicker(time.Second / 60).C {
-		if joyPress.Read() == rpio.Low {
-			break
+	for p := 7; p >= 0; p-- {
+		for len(enc) <= screenWidth {
+			k := keys[rand.Intn(len(keys))]
+			enc = append(enc, font[rune(k)]...)
 		}
 
-		for p := 7; p >= 0; p-- {
-			for len(enc) <= screenWidth {
-				k := keys[rand.Intn(len(keys))]
-				enc = append(enc, font[rune(k)]...)
-			}
-
-			writeRegister(0xB0+byte(p), 0x02, 0x10)
-			writeData(enc)
-			enc = []byte{}
-		}
+		writeRegister(0xB0+byte(p), 0x02, 0x10)
+		writeData(enc)
+		enc = []byte{}
 	}
 }
 
