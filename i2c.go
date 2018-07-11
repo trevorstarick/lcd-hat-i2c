@@ -188,6 +188,7 @@ func padRight(d []byte) []byte {
 	padding := make([]byte, (128 - len(d)))
 	return append(d, padding...)
 }
+
 func padCenter(d []byte) []byte {
 	padding := make([]byte, (128-len(d))/2)
 	return append(padding, d...)
@@ -390,11 +391,37 @@ func main() {
 	defer rpio.Close()
 	defer dev.Close()
 
-	modes := []string{"cpu", "disk", "host", "mem", "net", "process"}
+	var cpuPercentage []float64
+
+	go func() {
+		for range time.NewTicker(time.Second).C {
+			cpuPercentage, _ = cpu.Percent(time.Second, true)
+		}
+	}()
+
+	bootMessages := []string{
+		"Reticulating Splines",
+		"Downloading More RAM",
+		"rm -rf /",
+	}
+
+	bootMessage := bootMessages[rng.Intn(len(bootMessages))]
+
+	for range time.NewTicker(time.Second / 15).C {
+		if len(cpuPercentage) != 0 {
+			break
+		}
+
+		bootScreen(bootMessage)
+	}
+
+	clear()
+
+	modes := []string{"cpu", "host", "mem", "net"}
 	modeIndex := 0
 
 	go func() {
-		for range time.NewTicker(time.Millisecond * 100).C {
+		for range time.NewTicker(time.Second / 5).C {
 			if joyLeft.Read() == rpio.Low {
 				modeIndex--
 			} else if joyRight.Read() == rpio.Low {
@@ -406,13 +433,6 @@ func main() {
 	}()
 
 	lastIndex := modeIndex
-	var cpuPercentage []float64
-
-	go func() {
-		for range time.NewTicker(time.Second).C {
-			cpuPercentage, _ = cpu.Percent(time.Second, true)
-		}
-	}()
 
 	for range time.NewTicker(time.Second / 15).C {
 		if lastIndex != modeIndex {
