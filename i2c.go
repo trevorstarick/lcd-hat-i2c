@@ -260,7 +260,7 @@ func printText(text string, _offset ...int) int {
 
 	for _, page := range pages[start:end] {
 		writeRegister(0xB7-byte(offset), 0x02, 0x10)
-		writeData(page)
+		writeData(padRight(page))
 		offset++
 	}
 
