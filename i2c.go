@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -206,7 +206,6 @@ func buildText(text string) [][]byte {
 		if len(enc) > 0 {
 			pages = append(pages, enc[:len(enc)-4])
 			enc = []byte{}
-			p--
 		}
 	}
 
@@ -362,48 +361,84 @@ func printRandomRune() {
 func init() {
 	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	initDevice()
+	clear()
 }
 
 func main() {
 	defer rpio.Close()
 	defer dev.Close()
 
-	for {
-		// clear screen
-		clear()
-
-		// todo: handle non ascii char
-		printText("¯\\_(ツ)_/¯")
-		printText("45.5017° N, 73.5673° W")
-		wait()
-		clear()
-
-		printFont()
-		wait()
-		clear()
-
-		printRandomRune()
-		time.Sleep(100 * time.Millisecond)
-		clear()
-
-		printDots()
-		time.Sleep(100 * time.Millisecond)
-		clear()
-
-		printTweet(
-			"Mark Nottingham",
-			"mnot",
-			"TIL: Chrome disables the browser cache if it thinks it's on a broken HTTPS connection (e.g., invalid cert)",
-		)
-		wait()
-		clear()
-
-		printTweet(
-			"Robin Ward",
-			"eviltrout",
+	tweets := [][]string{
+		{
+			"Robin Ward (eviltrout)",
 			"Bad Blood is a stressful read for me. Theranos has all the bad elements of every startup I've ever encountered, but amplified 100x.",
-		)
-		wait()
-		clear()
+		},
+		{
+			"Ashley McNamara (ashleymcnamara)",
+			"I just wasted 1/4 of a bottle of all natural cleaner to kill a spider, so, from now on I'm only buying harsh cleaning chemicals because bleach wouldn't have let me down like this...",
+		},
+		{
+			"Tommy Refenes (TommyRefenes)",
+			"I'm an Elon Musk fan but it is kind of funny thinking that he built that submarine and took it all the way there and they're like oh thanks and then I just put it off to the side",
+		},
+		{
+			"Mark Nottingham (mnot)",
+			"TIL: Chrome disables the browser cache if it thinks it's on a broken HTTPS connection (e.g., invalid cert)",
+		},
+	}
+
+	// for range time.NewTicker(time.Millisecond * 100).C {
+	// 	v, _ := mem.VirtualMemory()
+
+	// 	printTextWithTitle("memory",
+	// 		strings.Join([]string{
+	// 			fmt.Sprintf("Total: %v", bytefmt(v.Total)),
+	// 			fmt.Sprintf("Free: %v", bytefmt(v.Free)),
+	// 			fmt.Sprintf("Used: %.2f%%", v.UsedPercent),
+	// 		}, "\n"))
+	// }
+	// return
+
+	for {
+		// todo: handle non ascii char
+		// printText("¯\\_(ツ)_/¯", 0)
+		// printText("45.5017° N, 73.5673° W", 1)
+		// wait()
+		// clear()
+
+		// printFont()
+		// wait()
+		// clear()
+
+		// printRandomRune()
+		// time.Sleep(100 * time.Millisecond)
+		// clear()
+
+		// printDots()
+		// time.Sleep(100 * time.Millisecond)
+		// clear()
+
+		i := 0
+		offset := 0
+		keep := true
+
+		for keep {
+			tweet := tweets[i]
+			printTextWithTitle(tweet[0], tweet[1], offset)
+			for {
+				if joyLeft.Read() == rpio.Low && i > 0 {
+					i--
+					break
+				} else if joyRight.Read() == rpio.Low && i < len(tweets)-1 {
+					i++
+					break
+				}
+			}
+
+			time.Sleep(250 * time.Millisecond)
+
+			clear()
+		}
+
 	}
 }
