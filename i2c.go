@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"sort"
@@ -9,7 +10,13 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/host"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
+
 	"github.com/stianeikeland/go-rpio"
+
 	"golang.org/x/exp/io/i2c"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
@@ -368,77 +375,97 @@ func main() {
 	defer rpio.Close()
 	defer dev.Close()
 
-	tweets := [][]string{
-		{
-			"Robin Ward (eviltrout)",
-			"Bad Blood is a stressful read for me. Theranos has all the bad elements of every startup I've ever encountered, but amplified 100x.",
-		},
-		{
-			"Ashley McNamara (ashleymcnamara)",
-			"I just wasted 1/4 of a bottle of all natural cleaner to kill a spider, so, from now on I'm only buying harsh cleaning chemicals because bleach wouldn't have let me down like this...",
-		},
-		{
-			"Tommy Refenes (TommyRefenes)",
-			"I'm an Elon Musk fan but it is kind of funny thinking that he built that submarine and took it all the way there and they're like oh thanks and then I just put it off to the side",
-		},
-		{
-			"Mark Nottingham (mnot)",
-			"TIL: Chrome disables the browser cache if it thinks it's on a broken HTTPS connection (e.g., invalid cert)",
-		},
-	}
+	modes := []string{"cpu", "disk", "host", "mem", "net", "process"}
+	modeIndex := 0
 
-	// for range time.NewTicker(time.Millisecond * 100).C {
-	// 	v, _ := mem.VirtualMemory()
-
-	// 	printTextWithTitle("memory",
-	// 		strings.Join([]string{
-	// 			fmt.Sprintf("Total: %v", bytefmt(v.Total)),
-	// 			fmt.Sprintf("Free: %v", bytefmt(v.Free)),
-	// 			fmt.Sprintf("Used: %.2f%%", v.UsedPercent),
-	// 		}, "\n"))
-	// }
-	// return
-
-	for {
-		// todo: handle non ascii char
-		// printText("¯\\_(ツ)_/¯", 0)
-		// printText("45.5017° N, 73.5673° W", 1)
-		// wait()
-		// clear()
-
-		// printFont()
-		// wait()
-		// clear()
-
-		// printRandomRune()
-		// time.Sleep(100 * time.Millisecond)
-		// clear()
-
-		// printDots()
-		// time.Sleep(100 * time.Millisecond)
-		// clear()
-
-		i := 0
-		offset := 0
-		keep := true
-
-		for keep {
-			tweet := tweets[i]
-			printTextWithTitle(tweet[0], tweet[1], offset)
-			for {
-				if joyLeft.Read() == rpio.Low && i > 0 {
-					i--
-					break
-				} else if joyRight.Read() == rpio.Low && i < len(tweets)-1 {
-					i++
-					break
-				}
+	go func() {
+		for range time.NewTicker(time.Millisecond * 100).C {
+			if joyLeft.Read() == rpio.Low {
+				modeIndex--
+			} else if joyRight.Read() == rpio.Low {
+				modeIndex++
 			}
 
-			time.Sleep(250 * time.Millisecond)
+			modeIndex = (len(modes) + modeIndex) % len(modes)
+		}
+	}()
 
+	lastIndex := modeIndex
+	var cpuPercentage []float64
+
+	go func() {
+		for range time.NewTicker(time.Second).C {
+			cpuPercentage, _ = cpu.Percent(time.Second, true)
+		}
+	}()
+
+	for range time.NewTicker(time.Second / 15).C {
+		if lastIndex != modeIndex {
 			clear()
 		}
 
+		lastIndex = modeIndex
+
+		switch modes[modeIndex] {
+		case "cpu":
+			data := []string{}
+
+			for i, c := range cpuPercentage {
+				data = append(data, fmt.Sprintf("core %v: %.2f", i, c))
+			}
+
+			printTextWithTitle("cpu", strings.Join(data, "\n"))
+			break
+		case "disk":
+			data := []string{}
+
+			// todo: disk
+			// diskUsage, _ := disk.Partitions(true)
+			// for _, d := range diskUsage {
+			// 	data = append(data, fmt.Sprintf("%v", d.Mountpoint))
+			// }
+
+			printTextWithTitle("disk", strings.Join(data, "\n"))
+			break
+		case "host":
+			info, _ := host.Info()
+
+			data := []string{
+				fmt.Sprintf("hostname: %v", info.Hostname),
+				fmt.Sprintf("uptime: %v", info.Uptime),
+			}
+
+			printTextWithTitle("host", strings.Join(data, "\n"))
+			break
+		case "mem":
+			data := []string{}
+			v, _ := mem.VirtualMemory()
+
+			data = []string{
+				fmt.Sprintf("Total: %v", bytefmt(v.Total)),
+				fmt.Sprintf("Free: %v", bytefmt(v.Free)),
+				fmt.Sprintf("Used: %.2f%%", v.UsedPercent),
+			}
+
+			printTextWithTitle("memory", strings.Join(data, "\n"))
+			break
+		case "net":
+			data := []string{}
+
+			ifaces, _ := net.Interfaces()
+			for _, iface := range ifaces {
+				addr := iface.Addrs[0].Addr
+				data = append(data, fmt.Sprintf("%s: %s", iface.Name, addr))
+			}
+
+			printTextWithTitle("net", strings.Join(data, "\n"))
+			break
+		case "process":
+			data := []string{}
+			// spew.Dump(process.Processes())
+			printTextWithTitle("process", strings.Join(data, "\n"))
+			break
+
+		}
 	}
 }
