@@ -454,8 +454,10 @@ func main() {
 
 			ifaces, _ := net.Interfaces()
 			for _, iface := range ifaces {
-				addr := iface.Addrs[0].Addr
-				data = append(data, fmt.Sprintf("%s: %s", iface.Name, addr))
+				if len(iface.Addrs) > 0 {
+					addr := iface.Addrs[0].Addr
+					data = append(data, fmt.Sprintf("%s: %s", iface.Name, addr))
+				}
 			}
 
 			printTextWithTitle("net", strings.Join(data, "\n"))
